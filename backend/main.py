@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session  # <-- Added Session here!
 from dotenv import load_dotenv
+from groq import Groq
 
 # ---------- 1. LOAD ENVIRONMENT VARIABLES ----------
 load_dotenv()
@@ -118,3 +119,31 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):  # <-- FIXED
     db.delete(db_product)
     db.commit()
     return None
+
+
+# ---------- 8. GROQ AI ENDPOINT ----------
+@app.post("/api/chat")
+async def chat_with_groq(request: dict):
+    try:
+        user_message = request.get("message")
+        if not user_message:
+            raise HTTPException(status_code=400, detail="Message is required")
+
+        # Initialize Groq (it automatically looks for GROQ_API_KEY in environment)
+        client = Groq()
+
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": user_message,
+                }
+            ],
+            model="llama-3.3-70b-versatile",  # You can change this later
+        )
+
+        ai_response = chat_completion.choices[0].message.content
+        return {"response": ai_response}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Groq API error: {str(e)}")
