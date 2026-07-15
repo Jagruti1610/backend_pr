@@ -92,7 +92,15 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-# ---------- 8. GET CURRENT USER (DEPENDENCY) ----------
+# ---------- 8. DEPENDENCY: Get DB Session (MOVED HERE - BEFORE get_current_user) ----------
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# ---------- 9. GET CURRENT USER (DEPENDENCY) ----------
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -112,7 +120,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     return user
 
-# ---------- 9. FASTAPI APP & CORS ----------
+# ---------- 10. FASTAPI APP & CORS ----------
 app = FastAPI(title="Aviraa Inventory API")
 
 app.add_middleware(
@@ -125,14 +133,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ---------- 10. DEPENDENCY: Get DB Session ----------
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # ---------- 11. AUTH ENDPOINTS ----------
 @app.post("/api/auth/signup")
@@ -224,7 +224,7 @@ def delete_product(product_id: int, db: Session = Depends(get_db), current_user:
     db.commit()
     return None
 
-# ---------- 14. ADMIN ENDPOINTS ----------
+# ---------- 13. ADMIN ENDPOINTS ----------
 @app.get("/api/users")
 async def get_all_users(db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
     if current_user.role != "admin":
@@ -258,7 +258,7 @@ async def update_user_role(user_id: int, role: str, db: Session = Depends(get_db
     db.commit()
     return {"message": f"User {user.username} role updated to {role}"}
 
-# ---------- 13. GROQ AI ENDPOINT (SMART + STREAMING) ----------
+# ---------- 14. GROQ AI ENDPOINT (SMART + STREAMING) ----------
 @app.post("/api/chat/stream")
 async def chat_stream(request: dict, current_user: UserDB = Depends(get_current_user)):
     try:
