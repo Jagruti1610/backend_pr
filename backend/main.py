@@ -224,6 +224,40 @@ def delete_product(product_id: int, db: Session = Depends(get_db), current_user:
     db.commit()
     return None
 
+# ---------- 14. ADMIN ENDPOINTS ----------
+@app.get("/api/users")
+async def get_all_users(db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    users = db.query(UserDB).all()
+    return [{"id": u.id, "username": u.username, "role": u.role, "created_at": u.created_at} for u in users]
+
+@app.delete("/api/users/{user_id}")
+async def delete_user(user_id: int, db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    if current_user.id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted"}
+
+@app.put("/api/users/{user_id}/role")
+async def update_user_role(user_id: int, role: str, db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    if role not in ["admin", "user"]:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.role = role
+    db.commit()
+    return {"message": f"User {user.username} role updated to {role}"}
+
 # ---------- 13. GROQ AI ENDPOINT (SMART + STREAMING) ----------
 @app.post("/api/chat/stream")
 async def chat_stream(request: dict, current_user: UserDB = Depends(get_current_user)):
